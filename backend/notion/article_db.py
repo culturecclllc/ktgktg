@@ -1,24 +1,46 @@
 # notion/article_db.py
 # 기록 저장용 Notion Database 설정
 import os
+import traceback
+from dotenv import load_dotenv
+
+# .env 파일에서 환경 변수 로드
+load_dotenv()
+
 try:
     from notion_client import Client
     import httpx
     
-    # 기록 저장용 API 키 (환경 변수에서 읽기)
-    ARTICLE_NOTION_API_KEY = os.getenv("ARTICLE_NOTION_API_KEY", "")
-    
-    # 기록 저장용 Database ID (환경 변수에서 읽기)
-    # URL: https://www.notion.so/2eabe3c7b25480a5b8e2fbb68b891e77?v=2eabe3c7b254809a8747000c0cfa9791
-    # Database ID는 URL의 첫 번째 부분입니다
-    ARTICLE_DATABASE_ID = os.getenv("ARTICLE_DATABASE_ID", "")
-    
-    article_notion = Client(auth=ARTICLE_NOTION_API_KEY)
     ARTICLE_NOTION_AVAILABLE = True
 except ImportError:
     ARTICLE_NOTION_AVAILABLE = False
-    article_notion = None
     import httpx
+
+
+def _get_article_notion_client():
+    """Notion 클라이언트를 생성합니다 (환경 변수에서 API 키를 읽음)"""
+    if not ARTICLE_NOTION_AVAILABLE:
+        return None
+    
+    api_key = os.getenv("ARTICLE_NOTION_API_KEY", "")
+    if not api_key:
+        return None
+    
+    try:
+        return Client(auth=api_key)
+    except Exception as e:
+        print(f"⚠️ Notion 클라이언트 생성 실패: {e}")
+        return None
+
+
+def _get_article_notion_api_key():
+    """Notion API 키를 반환합니다"""
+    return os.getenv("ARTICLE_NOTION_API_KEY", "")
+
+
+def _get_article_database_id():
+    """Notion Database ID를 반환합니다"""
+    return os.getenv("ARTICLE_DATABASE_ID", "")
 
 
 def _split_content_into_blocks(content: str, max_length: int = 2000) -> list:
@@ -169,20 +191,30 @@ def save_article_to_notion_db(
         print("오류: notion_client 모듈이 설치되지 않았습니다.")
         return False
     
-    if not ARTICLE_DATABASE_ID and not database_id:
+    # 환경 변수에서 API 키와 Database ID 읽기
+    article_api_key = _get_article_notion_api_key()
+    article_db_id = _get_article_database_id()
+    
+    if not article_db_id and not database_id:
         print("오류: Database ID가 설정되지 않았습니다. ARTICLE_DATABASE_ID를 설정하거나 database_id를 제공하세요.")
         return False
     
+    if not article_api_key:
+        print("오류: ARTICLE_NOTION_API_KEY가 설정되지 않았습니다.")
+        return False
+    
+    # Database ID가 제공되지 않으면 기본값 사용
+    target_db_id = database_id or article_db_id
+    
     try:
-        # Database ID가 제공되지 않으면 기본값 사용
-        target_db_id = database_id or ARTICLE_DATABASE_ID
-        
         # Notion API로 페이지 생성
         from datetime import datetime
         
         # 방법 1: notion-client 사용
-        try:
-            new_page = article_notion.pages.create(
+        article_notion = _get_article_notion_client()
+        if article_notion:
+            try:
+                article_notion.pages.create(
                 parent={"database_id": target_db_id},
                 properties={
                     "제목": {
@@ -260,112 +292,112 @@ def save_article_to_notion_db(
                     }
                 },
                 children=_split_content_into_blocks(content)  # 긴 내용을 여러 블록으로 분할
-            )
-            print(f"✅ notion-client로 저장 성공: {topic[:50]}...")
-            return True
-        except Exception as e:
-            print(f"⚠️ notion-client로 저장 실패, HTTP 직접 호출 시도: {e}")
-            import traceback
-            traceback.print_exc()
-            # 방법 2: HTTP 직접 호출
-            headers = {
-                "Authorization": f"Bearer {ARTICLE_NOTION_API_KEY}",
-                "Notion-Version": "2022-06-28",
-                "Content-Type": "application/json"
-            }
-            
-            payload = {
-                "parent": {"database_id": target_db_id},
-                "properties": {
-                    "제목": {
-                        "title": [
-                            {
-                                "text": {
-                                    "content": topic[:200]
-                                }
-                            }
-                        ]
-                    },
-                    "주제": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": topic
-                                }
-                            }
-                        ]
-                    },
-                    "내용": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": content[:2000]  # 미리보기용 (2000자 제한)
-                                }
-                            }
-                        ]
-                    },
-                    "생성일": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                }
-                            }
-                        ]
-                    },
-                    "사용자": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": user_id
-                                }
-                            }
-                        ]
-                    },
-                    "모델": {
-                        "select": {
-                            "name": model
-                        }
-                    },
-                    "글 의도": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": article_intent
-                                }
-                            }
-                        ]
-                    },
-                    "대상 독자": {
-                        "rich_text": [
-                            {
-                                "text": {
-                                    "content": target_audience
-                                }
-                            }
-                        ]
-                    },
-                    "유형": {
-                        "select": {
-                            "name": article_type
+                )
+                print(f"✅ notion-client로 저장 성공: {topic[:50]}...")
+                return True
+            except Exception as e:
+                print(f"⚠️ notion-client로 저장 실패, HTTP 직접 호출 시도: {e}")
+                traceback.print_exc()
+                # 방법 2: HTTP 직접 호출로 전환
+        
+        # 방법 2: HTTP 직접 호출 (notion-client 실패 시 또는 article_notion이 None일 때)
+        headers = {
+            "Authorization": f"Bearer {article_api_key}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "parent": {"database_id": target_db_id},
+            "properties": {
+            "제목": {
+                "title": [
+                    {
+                        "text": {
+                            "content": topic[:200]
                         }
                     }
-                },
-                "children": _split_content_into_blocks(content)  # 긴 내용을 여러 블록으로 분할
+                ]
+            },
+            "주제": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": topic
+                        }
+                    }
+                ]
+            },
+            "내용": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": content[:2000]  # 미리보기용 (2000자 제한)
+                        }
+                    }
+                ]
+            },
+            "생성일": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        }
+                    }
+                ]
+            },
+            "사용자": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": user_id
+                        }
+                    }
+                ]
+            },
+            "모델": {
+                "select": {
+                    "name": model
+                }
+            },
+            "글 의도": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": article_intent
+                        }
+                    }
+                ]
+            },
+            "대상 독자": {
+                "rich_text": [
+                    {
+                        "text": {
+                            "content": target_audience
+                        }
+                    }
+                ]
+            },
+            "유형": {
+                "select": {
+                    "name": article_type
+                }
             }
-            
-            url = "https://api.notion.com/v1/pages"
-            with httpx.Client() as client:
-                response = client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-            print(f"✅ HTTP 직접 호출로 저장 성공: {topic[:50]}...")
-            return True
-            
+        },
+        "children": _split_content_into_blocks(content)  # 긴 내용을 여러 블록으로 분할
+        }
+        
+        url = "https://api.notion.com/v1/pages"
+        with httpx.Client() as client:
+            response = client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+        print(f"✅ HTTP 직접 호출로 저장 성공: {topic[:50]}...")
+        return True
+    
     except Exception as e:
         print(f"❌ Notion에 글 저장 실패: {e}")
         print(f"   Database ID: {target_db_id}")
-        print(f"   API Key: {ARTICLE_NOTION_API_KEY[:20]}...")
-        import traceback
+        print(f"   API Key: {article_api_key[:20] if article_api_key else '(없음)'}...")
         traceback.print_exc()
         return False
 
@@ -381,8 +413,13 @@ def _get_page_content(page_id: str) -> str:
         페이지 본문의 전체 텍스트 내용
     """
     try:
+        article_api_key = _get_article_notion_api_key()
+        if not article_api_key:
+            print("오류: ARTICLE_NOTION_API_KEY가 설정되지 않았습니다.")
+            return ""
+        
         headers = {
-            "Authorization": f"Bearer {ARTICLE_NOTION_API_KEY}",
+            "Authorization": f"Bearer {article_api_key}",
             "Notion-Version": "2022-06-28",
         }
         
@@ -474,17 +511,25 @@ def get_user_articles_from_notion_db(
         print("오류: notion_client 모듈이 설치되지 않았습니다.")
         return []
     
-    if not ARTICLE_DATABASE_ID and not database_id:
+    # 환경 변수에서 API 키와 Database ID 읽기
+    article_api_key = _get_article_notion_api_key()
+    article_db_id = _get_article_database_id()
+    
+    if not article_db_id and not database_id:
         print("오류: Database ID가 설정되지 않았습니다.")
         return []
     
+    if not article_api_key:
+        print("오류: ARTICLE_NOTION_API_KEY가 설정되지 않았습니다.")
+        return []
+    
     try:
-        target_db_id = database_id or ARTICLE_DATABASE_ID
+        target_db_id = database_id or article_db_id
         
         # HTTP 직접 호출만 사용 (notion-client의 query 메서드가 안정적이지 않음)
         try:
             headers = {
-                "Authorization": f"Bearer {ARTICLE_NOTION_API_KEY}",
+                "Authorization": f"Bearer {article_api_key}",
                 "Notion-Version": "2022-06-28",
                 "Content-Type": "application/json"
             }
