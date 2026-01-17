@@ -238,18 +238,20 @@ async def generate_draft_endpoint(
     try:
         print(f"📝 초안 생성 요청: user_id={user_id}, model={request.model}, topic={request.topic[:50]}...")
         
-        # API 키가 제공되면 환경 변수에 임시 설정
-        if request.api_key:
-            import os
+        # API 키 가져오기 (사용자별 저장된 키 또는 요청에서 제공된 키)
+        api_key = request.api_key
+        if not api_key:
+            # 사용자별 저장된 API 키 확인
+            user_keys = user_api_keys.get(user_id, {})
             if request.model == 'openai':
-                os.environ['OPENAI_API_KEY'] = request.api_key
-                print(f"   OpenAI API 키 설정됨: {request.api_key[:10]}...")
+                api_key = user_keys.get('openai', '')
             elif request.model == 'groq':
-                os.environ['GROQ_API_KEY'] = request.api_key
-                print(f"   Groq API 키 설정됨: {request.api_key[:10]}...")
+                api_key = user_keys.get('groq', '')
             elif request.model == 'gemini':
-                os.environ['GEMINI_API_KEY'] = request.api_key
-                print(f"   Gemini API 키 설정됨: {request.api_key[:10]}...")
+                api_key = user_keys.get('gemini', '')
+        
+        if api_key:
+            print(f"   {request.model.upper()} API 키 사용: {api_key[:10]}...")
         
         content = generate_draft(
             request.topic,
@@ -259,7 +261,8 @@ async def generate_draft_endpoint(
             request.model,
             request.detailed_keywords or "",
             request.age_groups or [],
-            request.gender or "전체"
+            request.gender or "전체",
+            api_key=api_key  # API 키 직접 전달
         )
         
         print(f"✅ 초안 생성 성공: user_id={user_id}, model={request.model}, content_length={len(content)}")
@@ -404,17 +407,22 @@ async def analyze_draft_endpoint(
 ):
     """초안 장단점 분석"""
     try:
-        # API 키가 제공되면 환경 변수에 임시 설정
-        if request.api_key:
-            import os
+        # API 키 가져오기 (사용자별 저장된 키 또는 요청에서 제공된 키)
+        api_key = request.api_key
+        if not api_key:
+            # 사용자별 저장된 API 키 확인
+            user_keys = user_api_keys.get(user_id, {})
             if request.model == 'openai':
-                os.environ['OPENAI_API_KEY'] = request.api_key
+                api_key = user_keys.get('openai', '')
             elif request.model == 'groq':
-                os.environ['GROQ_API_KEY'] = request.api_key
+                api_key = user_keys.get('groq', '')
             elif request.model == 'gemini':
-                os.environ['GEMINI_API_KEY'] = request.api_key
+                api_key = user_keys.get('gemini', '')
         
-        result = analyze_draft(request.draft_content, request.model)
+        if api_key:
+            print(f"   {request.model.upper()} API 키 사용: {api_key[:10]}...")
+        
+        result = analyze_draft(request.draft_content, request.model, api_key=api_key)
         
         # 사용 기록 저장은 별도 Database가 필요하므로 일단 비활성화
         # 필요시 별도 Database를 설정하고 활성화하세요

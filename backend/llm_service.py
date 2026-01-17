@@ -75,25 +75,28 @@ except ImportError:
     GEMINI_AVAILABLE = False
 
 
-def get_openai_client():
+def get_openai_client(api_key: Optional[str] = None):
     """OpenAI 클라이언트 생성"""
-    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise ValueError("OPENAI_API_KEY 환경변수가 설정되지 않았습니다.")
     return OpenAI(api_key=api_key)
 
 
-def get_groq_client():
+def get_groq_client(api_key: Optional[str] = None):
     """Groq 클라이언트 생성"""
-    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY 환경변수가 설정되지 않았습니다.")
     return Groq(api_key=api_key)
 
 
-def get_gemini_client():
+def get_gemini_client(api_key: Optional[str] = None):
     """Gemini 클라이언트 생성"""
-    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
     genai.configure(api_key=api_key)
@@ -353,7 +356,7 @@ def generate_content(title: str, keyword: str = "", model_type: str = "openai") 
         raise ValueError(f"지원하지 않는 모델 타입: {model_type}")
 
 
-def generate_draft(topic: str, article_intent: str, target_audience: str, tone_style: str, model_type: str = "openai", detailed_keywords: str = "", age_groups: list = None, gender: str = "전체") -> str:
+def generate_draft(topic: str, article_intent: str, target_audience: str, tone_style: str, model_type: str = "openai", detailed_keywords: str = "", age_groups: list = None, gender: str = "전체", api_key: Optional[str] = None) -> str:
     """
     주제 기반으로 블로그 초안 생성
     
@@ -419,7 +422,7 @@ def generate_draft(topic: str, article_intent: str, target_audience: str, tone_s
         if not OPENAI_AVAILABLE:
             raise ValueError("OpenAI 라이브러리가 설치되지 않았습니다. pip install openai")
         try:
-            client = get_openai_client()
+            client = get_openai_client(api_key=api_key)
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
@@ -471,7 +474,7 @@ def generate_draft(topic: str, article_intent: str, target_audience: str, tone_s
         if not GROQ_AVAILABLE:
             raise ValueError("Groq 라이브러리가 설치되지 않았습니다. pip install groq")
         try:
-            client = get_groq_client()
+            client = get_groq_client(api_key=api_key)
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
@@ -523,7 +526,7 @@ def generate_draft(topic: str, article_intent: str, target_audience: str, tone_s
         if not GEMINI_AVAILABLE:
             raise ValueError("Google Generative AI 라이브러리가 설치되지 않았습니다. pip install google-generativeai")
         try:
-            model = get_gemini_client()
+            model = get_gemini_client(api_key=api_key)
             response = model.generate_content(prompt)
             content = response.text.strip()
             
@@ -550,7 +553,7 @@ def generate_draft(topic: str, article_intent: str, target_audience: str, tone_s
         raise ValueError(f"지원하지 않는 모델 타입: {model_type}")
 
 
-def analyze_draft(draft_content: str, model_type: str = "openai") -> dict:
+def analyze_draft(draft_content: str, model_type: str = "openai", api_key: Optional[str] = None) -> dict:
     """
     초안의 장단점 분석
     
@@ -583,7 +586,7 @@ def analyze_draft(draft_content: str, model_type: str = "openai") -> dict:
         if not OPENAI_AVAILABLE:
             raise ValueError("OpenAI 라이브러리가 설치되지 않았습니다. pip install openai")
         try:
-            client = get_openai_client()
+            client = get_openai_client(api_key=api_key)
             response = client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
@@ -627,7 +630,7 @@ def analyze_draft(draft_content: str, model_type: str = "openai") -> dict:
         if not GROQ_AVAILABLE:
             raise ValueError("Groq 라이브러리가 설치되지 않았습니다. pip install groq")
         try:
-            client = get_groq_client()
+            client = get_groq_client(api_key=api_key)
             response = client.chat.completions.create(
                 model="llama-3.3-70b-versatile",
                 messages=[{"role": "user", "content": prompt}],
@@ -670,7 +673,7 @@ def analyze_draft(draft_content: str, model_type: str = "openai") -> dict:
     elif model_type == "gemini":
         if not GEMINI_AVAILABLE:
             raise ValueError("Google Generative AI 라이브러리가 설치되지 않았습니다. pip install google-generativeai")
-        model = get_gemini_client()
+        model = get_gemini_client(api_key=api_key)
         response = model.generate_content(prompt)
         # JSON 추출
         text = response.text.strip()
