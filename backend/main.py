@@ -138,11 +138,15 @@ def require_auth(request: Request):
     print(f"🔍 세션 조회: session_id={session_id[:20]}..., user_id={'있음' if user_id else '없음'}, 현재 세션 수={len(sessions)}")
     
     if not user_id:
-        print(f"❌ 세션 만료: session_id={session_id[:20]}...가 세션 목록에 없습니다.")
-        print(f"   현재 저장된 세션 목록: {list(sessions.keys())[:5]}...")  # 처음 5개만 표시
+        print(f"❌ 세션 만료: session_id={session_id[:20] if session_id else 'None'}...가 세션 목록에 없습니다.")
+        print(f"   현재 저장된 세션 수: {len(sessions)}")
+        if len(sessions) > 0:
+            print(f"   현재 저장된 세션 목록 (처음 3개): {list(sessions.keys())[:3]}")
+        else:
+            print(f"   ⚠️ 세션 목록이 비어있습니다. 서버가 재시작되었을 수 있습니다.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="세션이 만료되었습니다."
+            detail="세션이 만료되었습니다. 다시 로그인해주세요."
         )
     
     print(f"✅ 인증 성공: user_id={user_id}")
@@ -155,6 +159,7 @@ async def login(request: LoginRequest):
     try:
         if check_login(request.user_id, request.user_pw):
             session_id = SessionManager.create_session(request.user_id)
+            print(f"✅ 로그인 성공: user_id={request.user_id}, session_id={session_id[:20]}..., 현재 세션 수={len(sessions)}")
             response = JSONResponse({
                 "success": True,
                 "message": "로그인 성공",
@@ -493,17 +498,23 @@ async def generate_final_endpoint(
 ):
     """최종 고품질 글 생성 (3개 모델 강점 조합)"""
     try:
-        # API 키가 제공되면 환경 변수에 임시 설정
-        if request.api_key:
-            import os
-            # model 파라미터에 따라 적절한 환경 변수 설정
-            model = getattr(request, 'model', 'gemini')
+        print(f"📝 최종 글 생성 요청: user_id={user_id}, model={request.model or 'gemini'}")
+        
+        # API 키 가져오기 (사용자별 저장된 키 또는 요청에서 제공된 키)
+        model = request.model or 'gemini'
+        api_key = request.api_key
+        if not api_key:
+            # 사용자별 저장된 API 키 확인
+            user_keys = user_api_keys.get(user_id, {})
             if model == 'gemini':
-                os.environ['GEMINI_API_KEY'] = request.api_key
+                api_key = user_keys.get('gemini', '')
             elif model == 'openai':
-                os.environ['OPENAI_API_KEY'] = request.api_key
+                api_key = user_keys.get('openai', '')
             elif model == 'groq':
-                os.environ['GROQ_API_KEY'] = request.api_key
+                api_key = user_keys.get('groq', '')
+        
+        if api_key:
+            print(f"   {model.upper()} API 키 사용: {api_key[:10]}...")
         
         content = generate_final(
             request.topic,
@@ -511,8 +522,11 @@ async def generate_final_endpoint(
             request.target_audience,
             request.tone_style,
             request.drafts,
-            request.analyses
+            request.analyses,
+            api_key=api_key  # API 키 직접 전달
         )
+        
+        print(f"✅ 최종 글 생성 성공: user_id={user_id}, content_length={len(content)}")
         
         # 최종 글을 Notion 기록용 Database에 자동 저장 (백그라운드, 실패해도 계속 진행)
         try:

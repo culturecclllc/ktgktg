@@ -535,6 +535,11 @@ export default function MainPage({ onLogout }: MainPageProps) {
         }),
       });
 
+      // 401 오류 처리
+      if (handleAuthError(response)) {
+        throw new Error('세션이 만료되었습니다.'); // 에러를 던져서 중단
+      }
+
       const data = await response.json();
 
       if (response.ok) {

@@ -716,7 +716,7 @@ def analyze_draft(draft_content: str, model_type: str = "openai", api_key: Optio
         raise ValueError(f"지원하지 않는 모델 타입: {model_type}")
 
 
-def generate_final(topic: str, article_intent: str, target_audience: str, tone_style: str, drafts: list, analyses: list) -> str:
+def generate_final(topic: str, article_intent: str, target_audience: str, tone_style: str, drafts: list, analyses: list, api_key: Optional[str] = None) -> str:
     """
     3개 모델의 강점을 조합하여 최종 고품질 글 생성
     
@@ -795,7 +795,7 @@ def generate_final(topic: str, article_intent: str, target_audience: str, tone_s
     if not GEMINI_AVAILABLE:
         raise ValueError("Google Generative AI 라이브러리가 설치되지 않았습니다. pip install google-generativeai")
     try:
-        model = get_gemini_client()
+        model = get_gemini_client(api_key=api_key)
         response = model.generate_content(prompt)
         content = response.text.strip()
         
