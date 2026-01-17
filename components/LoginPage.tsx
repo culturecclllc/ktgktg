@@ -21,7 +21,8 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/auth/login', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,7 +44,7 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
     } catch (error: any) {
       // 네트워크 오류 또는 서버 연결 실패
       if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        setError('백엔드 서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요. (http://localhost:8000)');
+        setError('백엔드 서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.');
       } else {
         setError('서버에 연결할 수 없습니다.');
       }

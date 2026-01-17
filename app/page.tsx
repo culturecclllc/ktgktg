@@ -16,7 +16,8 @@ export default function Home() {
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃
 
       try {
-        const response = await fetch('http://localhost:8000/api/auth/check', {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+        const response = await fetch(`${backendUrl}/api/auth/check`, {
           credentials: 'include',
           signal: controller.signal,
         });

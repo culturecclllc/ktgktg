@@ -93,7 +93,8 @@ export default function MainPage({ onLogout }: MainPageProps) {
   useEffect(() => {
     const fetchApiKeys = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/settings/api-keys', {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+        const response = await fetch(`${backendUrl}/api/settings/api-keys`, {
           credentials: 'include',
         });
 
@@ -166,7 +167,8 @@ export default function MainPage({ onLogout }: MainPageProps) {
     // 각 모델별로 독립적으로 처리하여 실시간 업데이트
     const promises = models.map(async (model) => {
       try {
-        const response = await fetch('http://localhost:8000/api/generate/draft', {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+        const response = await fetch(`${backendUrl}/api/generate/draft`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -364,7 +366,8 @@ export default function MainPage({ onLogout }: MainPageProps) {
         const savedApiKeys = localStorage.getItem('api_keys');
         const apiKeys = savedApiKeys ? JSON.parse(savedApiKeys) : {};
 
-        const response = await fetch('http://localhost:8000/api/analyze/draft', {
+        const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+        const response = await fetch(`${backendUrl}/api/analyze/draft`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -480,7 +483,8 @@ export default function MainPage({ onLogout }: MainPageProps) {
       const successfulDrafts = drafts.filter(d => d.status === 'success');
       const successfulAnalyses = analyses.filter(a => a.status === 'success');
 
-      const response = await fetch('http://localhost:8000/api/generate/final', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+      const response = await fetch(`${backendUrl}/api/generate/final`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -537,7 +541,8 @@ export default function MainPage({ onLogout }: MainPageProps) {
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:8000/api/auth/logout', {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+      await fetch(`${backendUrl}/api/auth/logout`, {
         method: 'POST',
         credentials: 'include',
       });

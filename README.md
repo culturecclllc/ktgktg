@@ -82,18 +82,38 @@ cd ..
 4. 생성된 키를 복사 (형식: `AIza...`)
 5. 앱의 설정 페이지 또는 `backend/.env` 파일에 입력
 
-### 환경 변수 설정 (선택사항)
+### 환경 변수 설정 (필수: Notion API 키)
 
-`backend/.env` 파일을 생성하고 다음 내용을 추가할 수 있습니다:
+**⚠️ 중요**: 다른 컴퓨터에서 클론한 경우, `backend/.env` 파일을 생성해야 합니다.
 
+`backend/env.example` 파일을 참고하여 `backend/.env` 파일을 생성하세요:
+
+1. `backend/env.example` 파일을 복사
+2. `backend/.env` 파일로 이름 변경
+3. 실제 API 키로 값 변경
+
+**필수 설정 (Notion)**:
 ```env
+# 로그인 인증용 Notion API 키 및 Database ID
+NOTION_API_KEY=your_notion_login_api_key_here
+NOTION_DATABASE_ID=your_notion_login_database_id_here
+
+# 글 저장용 Notion API 키 및 Database ID
+ARTICLE_NOTION_API_KEY=your_notion_article_api_key_here
+ARTICLE_DATABASE_ID=your_notion_article_database_id_here
+```
+
+**선택 설정 (LLM API 키)**:
+```env
+# LLM API Keys (앱 내 설정 페이지에서도 입력 가능)
 OPENAI_API_KEY=your_openai_api_key
 GROQ_API_KEY=your_groq_api_key
 GEMINI_API_KEY=your_gemini_api_key
 ```
 
 > 💡 **참고**: 
-> - 환경 변수는 선택사항입니다. 앱 내 설정 페이지에서 입력하는 것이 더 편리합니다.
+> - Notion API 키는 **필수**입니다 (로그인 및 글 저장 기능에 필요).
+> - LLM API 키는 선택사항입니다. 앱 내 설정 페이지에서 입력하는 것이 더 편리합니다.
 > - 사용할 모델의 API 키만 설정하면 됩니다.
 > - 모든 모델의 키를 입력하면 3개 모델을 동시에 사용할 수 있습니다.
 

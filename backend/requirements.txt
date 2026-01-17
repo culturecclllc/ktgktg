@@ -6,3 +6,4 @@ groq>=0.4.0
 google-generativeai>=0.3.0
 notion-client>=2.0.0
 httpx>=0.24.0
+python-dotenv>=1.0.0

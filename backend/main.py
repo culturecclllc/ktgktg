@@ -5,6 +5,10 @@ from pydantic import BaseModel
 from typing import Optional
 import sys
 import os
+from dotenv import load_dotenv
+
+# .env 파일에서 환경 변수 로드
+load_dotenv()
 
 # 현재 디렉토리의 notion 모듈 import
 from notion.auth import check_login, save_article_to_notion, save_usage_log_to_notion, get_user_articles
@@ -16,7 +20,11 @@ app = FastAPI(title="Multi-LLM Blog Automation API")
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://ktgktg.vercel.app",  # Vercel 프론트엔드 URL
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
