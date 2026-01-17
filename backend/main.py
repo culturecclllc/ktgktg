@@ -151,7 +151,8 @@ async def login(request: LoginRequest):
                 httponly=True,
                 samesite="none",  # 다른 도메인 간 요청을 위해 "none" 필요
                 secure=True,  # HTTPS 환경을 위해 필요
-                max_age=86400  # 24시간
+                max_age=86400,  # 24시간
+                domain=None  # 도메인을 명시하지 않으면 요청 도메인에 자동 설정
             )
             return response
         else:
