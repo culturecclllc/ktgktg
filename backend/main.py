@@ -512,8 +512,8 @@ async def generate_final_endpoint(
         model = request.model or 'gemini'
         api_key = request.api_key
         if not api_key:
-            # 사용자별 저장된 API 키 확인
-            user_keys = user_api_keys.get(user_id, {})
+            # Notion Database에서 사용자별 저장된 API 키 확인
+            user_keys = get_user_api_keys_from_notion(user_id)
             if model == 'gemini':
                 api_key = user_keys.get('gemini', '')
             elif model == 'openai':
