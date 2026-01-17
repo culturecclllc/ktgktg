@@ -15,7 +15,7 @@ from notion.auth import check_login, save_article_to_notion, save_usage_log_to_n
 from notion.article_db import save_article_to_notion_db, get_user_articles_from_notion_db
 from llm_service import generate_title, generate_content, generate_draft, analyze_draft, generate_final
 
-app = FastAPI(title="Multi-LLM Blog Automation API")
+app = FastAPI(title="YNK 블로그 자동화")
 
 # CORS 설정
 app.add_middleware(
@@ -594,7 +594,7 @@ async def get_api_keys(
 
 @app.get("/")
 async def root():
-    return {"message": "Multi-LLM Blog Automation API"}
+    return {"message": "YNK 블로그 자동화 API"}
 
 
 if __name__ == "__main__":
