@@ -21,6 +21,7 @@ export default function Home() {
         setIsLoading(false);
         return;
       }
+
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃
 
