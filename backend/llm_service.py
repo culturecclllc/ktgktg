@@ -684,6 +684,7 @@ def analyze_draft(draft_content: str, model_type: str = "openai") -> dict:
         # 비한국어 문자 제거 (pros, cons, improvement)
         # 한자/일본어/중국어/러시아어/베트남어 등 비한글 문자 제거
         def remove_non_korean(text: str) -> str:
+            import re  # 함수 내부에서 re 모듈 명시적 import
             if not isinstance(text, str):
                 return text
             # 한자 제거

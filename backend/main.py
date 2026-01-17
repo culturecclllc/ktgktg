@@ -111,10 +111,10 @@ class SessionManager:
 
 
 def get_session_id(request: Request) -> Optional[str]:
-    """쿠키나 헤더에서 세션 ID 가져오기"""
-    session_id = request.cookies.get("session_id")
+    """쿠키나 헤더에서 세션 ID 가져오기 (X-Session-ID 헤더 우선)"""
+    session_id = request.headers.get("X-Session-ID")  # X-Session-ID 헤더 우선 확인
     if not session_id:
-        session_id = request.headers.get("X-Session-ID")
+        session_id = request.cookies.get("session_id")  # 없으면 쿠키 확인 (fallback)
     return session_id
 
 
@@ -560,15 +560,45 @@ async def save_api_keys(
     request: ApiKeysRequest,
     user_id: str = Depends(require_auth)
 ):
-    """사용자별 API 키 저장"""
+    """사용자별 API 키 저장 (다른 사용자의 키와 완전히 분리)"""
     try:
-        user_api_keys[user_id] = {
-            "openai": request.openai or "",
-            "groq": request.groq or "",
-            "gemini": request.gemini or "",
+        # user_id 검증 (None이거나 빈 문자열이면 오류)
+        if not user_id or not isinstance(user_id, str) or not user_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="사용자 인증 정보가 유효하지 않습니다."
+            )
+        
+        user_id = user_id.strip()  # 공백 제거
+        
+        # 기존 API 키 가져오기 (빈 문자열로 덮어쓰기 방지)
+        existing_keys = user_api_keys.get(user_id, {
+            "openai": "",
+            "groq": "",
+            "gemini": "",
+        })
+        
+        # 새로 제공된 키만 업데이트 (빈 문자열이 아닌 경우만)
+        new_keys = {
+            "openai": request.openai.strip() if request.openai and request.openai.strip() else existing_keys.get("openai", ""),
+            "groq": request.groq.strip() if request.groq and request.groq.strip() else existing_keys.get("groq", ""),
+            "gemini": request.gemini.strip() if request.gemini and request.gemini.strip() else existing_keys.get("gemini", ""),
         }
+        
+        # 해당 user_id에만 저장 (다른 사용자와 완전히 분리)
+        user_api_keys[user_id] = new_keys
+        
+        # 디버깅 로그 (저장된 user_id 명확히 표시)
+        print(f"✅ API 키 저장 완료: user_id='{user_id}', openai={'설정됨' if new_keys['openai'] else '없음'}, groq={'설정됨' if new_keys['groq'] else '없음'}, gemini={'설정됨' if new_keys['gemini'] else '없음'}")
+        print(f"   현재 저장된 사용자 목록: {list(user_api_keys.keys())}")
+        
         return {"success": True, "message": "API 키가 저장되었습니다."}
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"❌ API 키 저장 실패: user_id='{user_id}', error={str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"API 키 저장 중 오류: {str(e)}"
@@ -579,15 +609,36 @@ async def save_api_keys(
 async def get_api_keys(
     user_id: str = Depends(require_auth)
 ):
-    """사용자별 API 키 조회"""
+    """사용자별 API 키 조회 (해당 사용자의 키만 반환)"""
     try:
+        # user_id 검증 (None이거나 빈 문자열이면 오류)
+        if not user_id or not isinstance(user_id, str) or not user_id.strip():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="사용자 인증 정보가 유효하지 않습니다."
+            )
+        
+        user_id = user_id.strip()  # 공백 제거
+        
+        # 해당 user_id의 키만 조회 (다른 사용자의 키는 접근 불가)
         api_keys = user_api_keys.get(user_id, {
             "openai": "",
             "groq": "",
             "gemini": "",
         })
+        
+        # 디버깅 로그 (조회한 user_id 명확히 표시)
+        print(f"🔍 API 키 조회: user_id='{user_id}', openai={'설정됨' if api_keys.get('openai') else '없음'}, groq={'설정됨' if api_keys.get('groq') else '없음'}, gemini={'설정됨' if api_keys.get('gemini') else '없음'}")
+        print(f"   현재 저장된 사용자 목록: {list(user_api_keys.keys())}")
+        
+        # 해당 user_id의 키만 반환 (보안을 위해 다른 사용자 데이터 제외)
         return {"api_keys": api_keys}
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"❌ API 키 조회 실패: user_id='{user_id}', error={str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"API 키 조회 중 오류: {str(e)}"

@@ -46,7 +46,8 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
     const fetchApiKeys = async () => {
       try {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/api/settings/api-keys`, {
+        const response = await fetch(`${backendUrl}/api/settings/api-keys`, {
+          headers: getAuthHeaders(), // X-Session-ID 헤더 추가
           credentials: 'include',
         });
 
@@ -57,6 +58,8 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
             groq: data.api_keys?.groq || '',
             gemini: data.api_keys?.gemini || '',
           });
+        } else {
+          console.error('API 키 조회 실패:', response.status, response.statusText);
         }
       } catch (error) {
         console.error('Fetch API keys error:', error);
