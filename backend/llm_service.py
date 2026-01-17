@@ -594,7 +594,7 @@ def analyze_draft(draft_content: str, model_type: str = "openai") -> dict:
             result = json.loads(response.choices[0].message.content.strip())
             
             # 비한국어 문자 제거 (pros, cons, improvement)
-            import re
+            # 파일 상단에서 이미 import re를 했으므로 함수 내부에서 다시 import할 필요 없음
             def remove_non_korean(text: str) -> str:
                 if not isinstance(text, str):
                     return text
@@ -638,7 +638,7 @@ def analyze_draft(draft_content: str, model_type: str = "openai") -> dict:
             result = json.loads(response.choices[0].message.content.strip())
             
             # 비한국어 문자 제거 (pros, cons, improvement)
-            import re
+            # 파일 상단에서 이미 import re를 했으므로 함수 내부에서 다시 import할 필요 없음
             def remove_non_korean(text: str) -> str:
                 if not isinstance(text, str):
                     return text
@@ -683,8 +683,8 @@ def analyze_draft(draft_content: str, model_type: str = "openai") -> dict:
         
         # 비한국어 문자 제거 (pros, cons, improvement)
         # 한자/일본어/중국어/러시아어/베트남어 등 비한글 문자 제거
+        # 파일 상단에서 이미 import re를 했으므로 함수 내부에서 다시 import할 필요 없음
         def remove_non_korean(text: str) -> str:
-            import re  # 함수 내부에서 re 모듈 명시적 import
             if not isinstance(text, str):
                 return text
             # 한자 제거

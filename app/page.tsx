@@ -25,6 +25,14 @@ export default function Home() {
         });
         if (response.ok) {
           setIsAuthenticated(true);
+        } else if (response.status === 401) {
+          // 세션이 만료되었거나 인증 실패
+          console.warn('세션이 만료되었습니다. 다시 로그인해주세요.');
+          setIsAuthenticated(false);
+          // localStorage에서 session_id 제거
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('session_id');
+          }
         }
       } catch (error: any) {
         // 네트워크 에러는 조용히 처리 (백엔드가 실행되지 않았을 수 있음)

@@ -40,6 +40,21 @@ export default function MainPage({ onLogout }: MainPageProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [selectedDraft, setSelectedDraft] = useState<{ model: string; content: string } | null>(null);
   
+  // 401 오류 처리 헬퍼 함수
+  const handleAuthError = (response: Response) => {
+    if (response.status === 401) {
+      console.warn('세션이 만료되었습니다. 다시 로그인해주세요.');
+      // localStorage에서 session_id 제거
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('session_id');
+      }
+      // 로그아웃 처리
+      onLogout();
+      return true;
+    }
+    return false;
+  };
+  
   // 플로팅 버튼 상태
   const [showFloatingMenu, setShowFloatingMenu] = useState(() => {
     const saved = localStorage.getItem('floating_menu_visible');
@@ -187,6 +202,11 @@ export default function MainPage({ onLogout }: MainPageProps) {
           }),
         });
 
+        // 401 오류 처리
+        if (handleAuthError(response)) {
+          return; // 로그아웃 처리됨
+        }
+
         let data;
         try {
           data = await response.json();
@@ -250,6 +270,10 @@ export default function MainPage({ onLogout }: MainPageProps) {
             // API 키 오류
             else if (rawError.includes('invalid_api_key') || rawError.includes('authentication') || rawError.includes('API 키')) {
               errorMessage = 'API 키가 유효하지 않습니다.\n설정에서 API 키를 확인해주세요.';
+            }
+            // API 키 미설정 오류
+            else if (rawError.includes('API_KEY') || rawError.includes('환경변수') || rawError.includes('설정되지 않았습니다')) {
+              errorMessage = 'API 키가 설정되지 않았습니다.\n설정 페이지에서 API 키를 입력해주세요.';
             }
             // 원본 메시지에서 핵심 부분만 추출
             else {
@@ -377,6 +401,11 @@ export default function MainPage({ onLogout }: MainPageProps) {
             api_key: apiKeys[model.apiName as keyof typeof apiKeys] || '',
           }),
         });
+
+        // 401 오류 처리
+        if (handleAuthError(response)) {
+          throw new Error('세션이 만료되었습니다.'); // 에러를 던져서 중단
+        }
 
         const data = await response.json();
 

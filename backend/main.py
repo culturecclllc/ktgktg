@@ -121,17 +121,31 @@ def get_session_id(request: Request) -> Optional[str]:
 def require_auth(request: Request):
     """인증이 필요한 엔드포인트용 의존성"""
     session_id = get_session_id(request)
+    
+    # 디버깅 로그
+    print(f"🔍 인증 확인: session_id={'있음' if session_id else '없음'}, X-Session-ID={request.headers.get('X-Session-ID', '없음')}, Cookie={request.cookies.get('session_id', '없음')}")
+    
     if not session_id:
+        print(f"❌ 세션 ID 없음: 로그인이 필요합니다.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="로그인이 필요합니다."
         )
+    
     user_id = SessionManager.get_user_id(session_id)
+    
+    # 디버깅 로그
+    print(f"🔍 세션 조회: session_id={session_id[:20]}..., user_id={'있음' if user_id else '없음'}, 현재 세션 수={len(sessions)}")
+    
     if not user_id:
+        print(f"❌ 세션 만료: session_id={session_id[:20]}...가 세션 목록에 없습니다.")
+        print(f"   현재 저장된 세션 목록: {list(sessions.keys())[:5]}...")  # 처음 5개만 표시
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="세션이 만료되었습니다."
         )
+    
+    print(f"✅ 인증 성공: user_id={user_id}")
     return user_id
 
 
@@ -222,15 +236,20 @@ async def generate_draft_endpoint(
 ):
     """초안 생성 (주제 기반)"""
     try:
+        print(f"📝 초안 생성 요청: user_id={user_id}, model={request.model}, topic={request.topic[:50]}...")
+        
         # API 키가 제공되면 환경 변수에 임시 설정
         if request.api_key:
             import os
             if request.model == 'openai':
                 os.environ['OPENAI_API_KEY'] = request.api_key
+                print(f"   OpenAI API 키 설정됨: {request.api_key[:10]}...")
             elif request.model == 'groq':
                 os.environ['GROQ_API_KEY'] = request.api_key
+                print(f"   Groq API 키 설정됨: {request.api_key[:10]}...")
             elif request.model == 'gemini':
                 os.environ['GEMINI_API_KEY'] = request.api_key
+                print(f"   Gemini API 키 설정됨: {request.api_key[:10]}...")
         
         content = generate_draft(
             request.topic,
@@ -242,6 +261,8 @@ async def generate_draft_endpoint(
             request.age_groups or [],
             request.gender or "전체"
         )
+        
+        print(f"✅ 초안 생성 성공: user_id={user_id}, model={request.model}, content_length={len(content)}")
         
         # 초안을 Notion 기록용 Database에 저장 (백그라운드, 실패해도 계속 진행)
         try:
@@ -277,9 +298,17 @@ async def generate_draft_endpoint(
         #     print(f"사용 기록 저장 실패 (무시): {e}")
         
         return {"content": content}
+    except HTTPException:
+        # HTTPException은 그대로 전달
+        raise
     except Exception as e:
         error_msg = str(e)
         error_dict = {}
+        
+        # 디버깅 로그
+        print(f"❌ 초안 생성 실패: user_id={user_id}, model={request.model}, error={error_msg}")
+        import traceback
+        traceback.print_exc()
         
         # 에러 메시지에서 딕셔너리 추출 시도
         import json
@@ -341,11 +370,27 @@ async def generate_draft_endpoint(
                     detail="Groq API 키가 유효하지 않습니다. API 키를 확인해주세요. https://console.groq.com/keys"
                 )
         
+        # ValueError는 그대로 전달 (API 키 오류 등)
+        if isinstance(e, ValueError):
+            # API 키 관련 오류인지 확인
+            if "API_KEY" in error_msg or "API key" in error_msg or "환경변수" in error_msg:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"{model_type.upper()} API 키가 설정되지 않았습니다. 설정 페이지에서 API 키를 입력해주세요."
+                )
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"초안 생성 중 오류: {error_msg}"
+                )
+        
         # 에러 메시지에서 핵심 정보 추출
         if error_dict.get('error', {}).get('message'):
             clean_msg = error_dict['error']['message']
         else:
             clean_msg = error_msg
+        
+        # 일반적인 서버 오류
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"초안 생성 중 오류: {clean_msg}"
