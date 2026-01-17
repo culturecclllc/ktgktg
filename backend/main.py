@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 현재 디렉토리의 notion 모듈 import
-from notion.auth import check_login, save_article_to_notion, save_usage_log_to_notion, get_user_articles
+from notion.auth import check_login, save_article_to_notion, save_usage_log_to_notion, get_user_articles, get_user_api_keys_from_notion, save_user_api_keys_to_notion
 from notion.article_db import save_article_to_notion_db, get_user_articles_from_notion_db
 from llm_service import generate_title, generate_content, generate_draft, analyze_draft, generate_final
 
@@ -38,8 +38,7 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ynk-blog-automation-secret-key-cha
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRATION_HOURS = 24 * 7  # 7일
 
-# 사용자별 API 키 저장 (user_id 기반)
-user_api_keys = {}
+# 참고: API 키는 이제 Notion Database에 저장됩니다 (user_api_keys 딕셔너리는 사용하지 않음)
 
 
 class LoginRequest(BaseModel):
@@ -255,8 +254,8 @@ async def generate_draft_endpoint(
         # API 키 가져오기 (사용자별 저장된 키 또는 요청에서 제공된 키)
         api_key = request.api_key
         if not api_key:
-            # 사용자별 저장된 API 키 확인
-            user_keys = user_api_keys.get(user_id, {})
+            # Notion Database에서 사용자별 저장된 API 키 확인
+            user_keys = get_user_api_keys_from_notion(user_id)
             if request.model == 'openai':
                 api_key = user_keys.get('openai', '')
             elif request.model == 'groq':
@@ -424,8 +423,8 @@ async def analyze_draft_endpoint(
         # API 키 가져오기 (사용자별 저장된 키 또는 요청에서 제공된 키)
         api_key = request.api_key
         if not api_key:
-            # 사용자별 저장된 API 키 확인
-            user_keys = user_api_keys.get(user_id, {})
+            # Notion Database에서 사용자별 저장된 API 키 확인
+            user_keys = get_user_api_keys_from_notion(user_id)
             if request.model == 'openai':
                 api_key = user_keys.get('openai', '')
             elif request.model == 'groq':
@@ -636,37 +635,41 @@ async def save_api_keys(
     request: ApiKeysRequest,
     user_id: str = Depends(require_auth)
 ):
-    """사용자별 API 키 저장 (다른 사용자의 키와 완전히 분리)"""
+    """사용자별 API 키 저장 (Notion Database에 저장)"""
     try:
-        # user_id 검증 (None이거나 빈 문자열이면 오류)
+        # user_id 검증
         if not user_id or not isinstance(user_id, str) or not user_id.strip():
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="사용자 인증 정보가 유효하지 않습니다."
             )
         
-        user_id = user_id.strip()  # 공백 제거
+        user_id = user_id.strip()
         
-        # 기존 API 키 가져오기 (빈 문자열로 덮어쓰기 방지)
-        existing_keys = user_api_keys.get(user_id, {
-            "openai": "",
-            "groq": "",
-            "gemini": "",
-        })
+        # Notion Database에 저장 (빈 문자열이 아닌 경우만 업데이트, 빈 문자열이면 기존 값 유지)
+        openai_key = request.openai.strip() if (request.openai and request.openai.strip()) else ""
+        groq_key = request.groq.strip() if (request.groq and request.groq.strip()) else ""
+        gemini_key = request.gemini.strip() if (request.gemini and request.gemini.strip()) else ""
         
-        # 새로 제공된 키만 업데이트 (빈 문자열이 아닌 경우만)
-        new_keys = {
-            "openai": request.openai.strip() if request.openai and request.openai.strip() else existing_keys.get("openai", ""),
-            "groq": request.groq.strip() if request.groq and request.groq.strip() else existing_keys.get("groq", ""),
-            "gemini": request.gemini.strip() if request.gemini and request.gemini.strip() else existing_keys.get("gemini", ""),
-        }
+        # Notion Database에 저장 (save_user_api_keys_to_notion이 빈 문자열 처리)
+        success = save_user_api_keys_to_notion(
+            user_id=user_id,
+            openai_key=openai_key,
+            groq_key=groq_key,
+            gemini_key=gemini_key
+        )
         
-        # 해당 user_id에만 저장 (다른 사용자와 완전히 분리)
-        user_api_keys[user_id] = new_keys
+        if not success:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Notion Database에 API 키 저장에 실패했습니다."
+            )
         
-        # 디버깅 로그 (저장된 user_id 명확히 표시)
-        print(f"✅ API 키 저장 완료: user_id='{user_id}', openai={'설정됨' if new_keys['openai'] else '없음'}, groq={'설정됨' if new_keys['groq'] else '없음'}, gemini={'설정됨' if new_keys['gemini'] else '없음'}")
-        print(f"   현재 저장된 사용자 목록: {list(user_api_keys.keys())}")
+        # 저장 후 최종 값 조회 (로그용)
+        final_keys = get_user_api_keys_from_notion(user_id)
+        
+        # 디버깅 로그
+        print(f"✅ API 키 저장 완료 (Notion): user_id='{user_id}', openai={'설정됨' if final_keys.get('openai') else '없음'}, groq={'설정됨' if final_keys.get('groq') else '없음'}, gemini={'설정됨' if final_keys.get('gemini') else '없음'}")
         
         return {"success": True, "message": "API 키가 저장되었습니다."}
     except HTTPException:
@@ -685,29 +688,23 @@ async def save_api_keys(
 async def get_api_keys(
     user_id: str = Depends(require_auth)
 ):
-    """사용자별 API 키 조회 (해당 사용자의 키만 반환)"""
+    """사용자별 API 키 조회 (Notion Database에서 조회)"""
     try:
-        # user_id 검증 (None이거나 빈 문자열이면 오류)
+        # user_id 검증
         if not user_id or not isinstance(user_id, str) or not user_id.strip():
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="사용자 인증 정보가 유효하지 않습니다."
             )
         
-        user_id = user_id.strip()  # 공백 제거
+        user_id = user_id.strip()
         
-        # 해당 user_id의 키만 조회 (다른 사용자의 키는 접근 불가)
-        api_keys = user_api_keys.get(user_id, {
-            "openai": "",
-            "groq": "",
-            "gemini": "",
-        })
+        # Notion Database에서 조회
+        api_keys = get_user_api_keys_from_notion(user_id)
         
-        # 디버깅 로그 (조회한 user_id 명확히 표시)
-        print(f"🔍 API 키 조회: user_id='{user_id}', openai={'설정됨' if api_keys.get('openai') else '없음'}, groq={'설정됨' if api_keys.get('groq') else '없음'}, gemini={'설정됨' if api_keys.get('gemini') else '없음'}")
-        print(f"   현재 저장된 사용자 목록: {list(user_api_keys.keys())}")
+        # 디버깅 로그
+        print(f"🔍 API 키 조회 (Notion): user_id='{user_id}', openai={'설정됨' if api_keys.get('openai') else '없음'}, groq={'설정됨' if api_keys.get('groq') else '없음'}, gemini={'설정됨' if api_keys.get('gemini') else '없음'}")
         
-        # 해당 user_id의 키만 반환 (보안을 위해 다른 사용자 데이터 제외)
         return {"api_keys": api_keys}
     except HTTPException:
         raise

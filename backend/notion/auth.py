@@ -646,3 +646,207 @@ def get_user_articles(user_id: str, database_id: str = None) -> list:
     except Exception as e:
         print(f"Notion에서 글 조회 실패: {e}")
         return []
+
+
+def get_user_api_keys_from_notion(user_id: str) -> dict:
+    """
+    Notion Database에서 사용자의 API 키 조회
+    
+    Args:
+        user_id: 사용자 ID (아이디 필드와 일치)
+    
+    Returns:
+        {"openai": "...", "groq": "...", "gemini": "..."} 형태의 딕셔너리
+    """
+    if not NOTION_AVAILABLE:
+        print("오류: notion_client 모듈이 설치되지 않았습니다.")
+        return {"openai": "", "groq": "", "gemini": ""}
+    
+    try:
+        # HTTP 직접 호출로 조회 (안정성)
+        headers = {
+            "Authorization": f"Bearer {NOTION_API_KEY}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
+        }
+        
+        url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
+        payload = {
+            "filter": {
+                "property": "아이디",
+                "title": {
+                    "equals": user_id
+                }
+            }
+        }
+        
+        with httpx.Client() as client:
+            response = client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            response_data = response.json()
+        
+        # 사용자 행 찾기
+        for page in response_data.get("results", []):
+            props = page.get("properties", {})
+            try:
+                # 아이디 확인
+                id_prop = props.get("아이디", {}).get("title", [])
+                if not id_prop:
+                    continue
+                
+                db_user_id = id_prop[0].get("text", {}).get("content", "")
+                if db_user_id != user_id:
+                    continue
+                
+                # API 키 추출
+                openai_prop = props.get("OpenAI API 키", {}).get("rich_text", [])
+                groq_prop = props.get("Groq API 키", {}).get("rich_text", [])
+                gemini_prop = props.get("Gemini API 키", {}).get("rich_text", [])
+                
+                openai_key = openai_prop[0].get("text", {}).get("content", "") if openai_prop else ""
+                groq_key = groq_prop[0].get("text", {}).get("content", "") if groq_prop else ""
+                gemini_key = gemini_prop[0].get("text", {}).get("content", "") if gemini_prop else ""
+                
+                return {
+                    "openai": openai_key,
+                    "groq": groq_key,
+                    "gemini": gemini_key
+                }
+            except (KeyError, IndexError, TypeError) as e:
+                print(f"API 키 파싱 오류: {e}")
+                continue
+        
+        # 사용자를 찾지 못한 경우 빈 값 반환
+        return {"openai": "", "groq": "", "gemini": ""}
+        
+    except Exception as e:
+        print(f"Notion에서 API 키 조회 실패: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"openai": "", "groq": "", "gemini": ""}
+
+
+def save_user_api_keys_to_notion(user_id: str, openai_key: str = "", groq_key: str = "", gemini_key: str = "") -> bool:
+    """
+    Notion Database에 사용자의 API 키 저장 (기존 행 업데이트)
+    
+    Args:
+        user_id: 사용자 ID (아이디 필드와 일치)
+        openai_key: OpenAI API 키 (빈 문자열이면 업데이트하지 않음)
+        groq_key: Groq API 키 (빈 문자열이면 업데이트하지 않음)
+        gemini_key: Gemini API 키 (빈 문자열이면 업데이트하지 않음)
+    
+    Returns:
+        저장 성공 여부
+    """
+    if not NOTION_AVAILABLE:
+        print("오류: notion_client 모듈이 설치되지 않았습니다.")
+        return False
+    
+    try:
+        # 먼저 사용자 행 찾기
+        headers = {
+            "Authorization": f"Bearer {NOTION_API_KEY}",
+            "Notion-Version": "2022-06-28",
+            "Content-Type": "application/json"
+        }
+        
+        url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
+        payload = {
+            "filter": {
+                "property": "아이디",
+                "title": {
+                    "equals": user_id
+                }
+            }
+        }
+        
+        with httpx.Client() as client:
+            response = client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+            response_data = response.json()
+        
+        # 사용자 행 찾기
+        page_id = None
+        existing_keys = {"openai": "", "groq": "", "gemini": ""}
+        
+        for page in response_data.get("results", []):
+            props = page.get("properties", {})
+            try:
+                id_prop = props.get("아이디", {}).get("title", [])
+                if not id_prop:
+                    continue
+                
+                db_user_id = id_prop[0].get("text", {}).get("content", "")
+                if db_user_id == user_id:
+                    page_id = page.get("id")
+                    
+                    # 기존 API 키 가져오기
+                    openai_prop = props.get("OpenAI API 키", {}).get("rich_text", [])
+                    groq_prop = props.get("Groq API 키", {}).get("rich_text", [])
+                    gemini_prop = props.get("Gemini API 키", {}).get("rich_text", [])
+                    
+                    existing_keys["openai"] = openai_prop[0].get("text", {}).get("content", "") if openai_prop else ""
+                    existing_keys["groq"] = groq_prop[0].get("text", {}).get("content", "") if groq_prop else ""
+                    existing_keys["gemini"] = gemini_prop[0].get("text", {}).get("content", "") if gemini_prop else ""
+                    break
+            except (KeyError, IndexError, TypeError):
+                continue
+        
+        if not page_id:
+            print(f"❌ 사용자를 찾을 수 없습니다: user_id={user_id}")
+            return False
+        
+        # 업데이트할 키 결정 (빈 문자열이 아닌 경우만 업데이트)
+        update_keys = {
+            "openai": openai_key if openai_key and openai_key.strip() else existing_keys["openai"],
+            "groq": groq_key if groq_key and groq_key.strip() else existing_keys["groq"],
+            "gemini": gemini_key if gemini_key and gemini_key.strip() else existing_keys["gemini"],
+        }
+        
+        # Notion 페이지 업데이트 (모든 필드 업데이트)
+        update_url = f"https://api.notion.com/v1/pages/{page_id}"
+        update_payload = {
+            "properties": {
+                "OpenAI API 키": {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": update_keys["openai"]
+                            }
+                        }
+                    ]
+                },
+                "Groq API 키": {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": update_keys["groq"]
+                            }
+                        }
+                    ]
+                },
+                "Gemini API 키": {
+                    "rich_text": [
+                        {
+                            "text": {
+                                "content": update_keys["gemini"]
+                            }
+                        }
+                    ]
+                },
+            }
+        }
+        
+        with httpx.Client() as client:
+            response = client.patch(update_url, headers=headers, json=update_payload)
+            response.raise_for_status()
+        
+        print(f"✅ Notion에 API 키 저장 성공: user_id={user_id}")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Notion에 API 키 저장 실패: user_id={user_id}, error={str(e)}")
+        import traceback
+        traceback.print_exc()
+        return False

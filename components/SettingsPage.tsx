@@ -50,6 +50,19 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
       if (response.ok) {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+        // 저장 후 바로 다시 조회하여 확인
+        const fetchResponse = await fetch(`${backendUrl}/api/settings/api-keys`, {
+          headers: getAuthHeaders(),
+          credentials: 'include',
+        });
+        if (fetchResponse.ok) {
+          const fetchData = await fetchResponse.json();
+          setApiKeys({
+            openai: fetchData.api_keys?.openai || '',
+            groq: fetchData.api_keys?.groq || '',
+            gemini: fetchData.api_keys?.gemini || '',
+          });
+        }
       } else {
         const data = await response.json();
         alert(data.detail || 'API 키 저장에 실패했습니다.');
