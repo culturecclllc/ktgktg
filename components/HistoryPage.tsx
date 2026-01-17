@@ -40,6 +40,16 @@ export default function HistoryPage({ onBack }: HistoryPageProps) {
         headers: getAuthHeaders(),
       });
 
+      // 401 오류 처리
+      if (response.status === 401) {
+        setError('세션이 만료되었습니다.');
+        // localStorage에서 session_id 제거
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('session_id');
+        }
+        return;
+      }
+
       if (response.ok) {
         const data = await response.json();
         setArticles(data.articles || []);
@@ -48,7 +58,7 @@ export default function HistoryPage({ onBack }: HistoryPageProps) {
           setSelectedArticle(data.articles[0]);
         }
       } else {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ detail: '기록을 불러오는데 실패했습니다.' }));
         setError(errorData.detail || '기록을 불러오는데 실패했습니다.');
       }
     } catch (err) {

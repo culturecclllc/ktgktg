@@ -31,7 +31,6 @@ app.add_middleware(
 )
 
 # 세션 관리 (간단한 인메모리 방식)
-# 세션 구조: {session_id: {'user_id': '...', 'created_at': timestamp}}
 sessions = {}
 
 # 사용자별 API 키 저장 (세션 기반)
@@ -94,58 +93,21 @@ class SaveArticleRequest(BaseModel):
 
 
 class SessionManager:
-    # 세션 만료 시간: 7일 (초 단위)
-    SESSION_EXPIRY_SECONDS = 7 * 24 * 60 * 60  # 7일
-    
     @staticmethod
     def create_session(user_id: str) -> str:
         import secrets
-        import time
         session_id = secrets.token_urlsafe(32)
-        sessions[session_id] = {
-            'user_id': user_id,
-            'created_at': time.time()
-        }
+        sessions[session_id] = user_id
         return session_id
 
     @staticmethod
     def get_user_id(session_id: str) -> Optional[str]:
-        import time
-        session_data = sessions.get(session_id)
-        if not session_data:
-            return None
-        
-        # 세션 만료 체크
-        current_time = time.time()
-        created_at = session_data.get('created_at', 0)
-        if current_time - created_at > SessionManager.SESSION_EXPIRY_SECONDS:
-            # 만료된 세션 삭제
-            del sessions[session_id]
-            return None
-        
-        return session_data.get('user_id')
+        return sessions.get(session_id)
 
     @staticmethod
     def delete_session(session_id: str):
         if session_id in sessions:
             del sessions[session_id]
-    
-    @staticmethod
-    def cleanup_expired_sessions():
-        """만료된 세션 정리"""
-        import time
-        current_time = time.time()
-        expired_sessions = []
-        for session_id, session_data in sessions.items():
-            created_at = session_data.get('created_at', 0)
-            if current_time - created_at > SessionManager.SESSION_EXPIRY_SECONDS:
-                expired_sessions.append(session_id)
-        
-        for session_id in expired_sessions:
-            del sessions[session_id]
-        
-        if expired_sessions:
-            print(f"🧹 만료된 세션 {len(expired_sessions)}개 정리 완료")
 
 
 def get_session_id(request: Request) -> Optional[str]:
@@ -158,11 +120,6 @@ def get_session_id(request: Request) -> Optional[str]:
 
 def require_auth(request: Request):
     """인증이 필요한 엔드포인트용 의존성"""
-    # 주기적으로 만료된 세션 정리 (100번 요청마다 한 번씩)
-    import random
-    if random.randint(1, 100) == 1:
-        SessionManager.cleanup_expired_sessions()
-    
     session_id = get_session_id(request)
     
     # 디버깅 로그
@@ -182,14 +139,9 @@ def require_auth(request: Request):
     
     if not user_id:
         print(f"❌ 세션 만료: session_id={session_id[:20] if session_id else 'None'}...가 세션 목록에 없습니다.")
-        print(f"   현재 저장된 세션 수: {len(sessions)}")
-        if len(sessions) > 0:
-            print(f"   현재 저장된 세션 목록 (처음 3개): {list(sessions.keys())[:3]}")
-        else:
-            print(f"   ⚠️ 세션 목록이 비어있습니다. 서버가 재시작되었을 수 있습니다.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="세션이 만료되었습니다. 다시 로그인해주세요."
+            detail="세션이 만료되었습니다."
         )
     
     print(f"✅ 인증 성공: user_id={user_id}")
@@ -202,7 +154,6 @@ async def login(request: LoginRequest):
     try:
         if check_login(request.user_id, request.user_pw):
             session_id = SessionManager.create_session(request.user_id)
-            print(f"✅ 로그인 성공: user_id={request.user_id}, session_id={session_id[:20]}..., 현재 세션 수={len(sessions)}")
             response = JSONResponse({
                 "success": True,
                 "message": "로그인 성공",
@@ -214,7 +165,7 @@ async def login(request: LoginRequest):
                 httponly=True,
                 samesite="none",  # 다른 도메인 간 요청을 위해 "none" 필요
                 secure=True,  # HTTPS 환경을 위해 필요
-                max_age=SessionManager.SESSION_EXPIRY_SECONDS,  # 7일
+                max_age=86400,  # 24시간
                 domain=None  # 도메인을 명시하지 않으면 요청 도메인에 자동 설정
             )
             return response

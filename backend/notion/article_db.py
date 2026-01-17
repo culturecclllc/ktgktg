@@ -178,7 +178,7 @@ def save_article_to_notion_db(
         target_db_id = database_id or ARTICLE_DATABASE_ID
         
         # Notion API로 페이지 생성
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime
         
         # 방법 1: notion-client 사용
         try:
@@ -216,7 +216,7 @@ def save_article_to_notion_db(
                         "rich_text": [
                             {
                                 "text": {
-                                    "content": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M:%S")
+                                    "content": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                 }
                             }
                         ]
@@ -308,7 +308,7 @@ def save_article_to_notion_db(
                         "rich_text": [
                             {
                                 "text": {
-                                    "content": datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m-%d %H:%M:%S")
+                                    "content": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                                 }
                             }
                         ]
