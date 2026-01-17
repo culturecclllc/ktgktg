@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: multi-llm-blog-automation-backend
+    env: python
+    buildCommand: cd backend && pip install -r requirements.txt
+    startCommand: cd backend && python main.py
+    envVars:
+      - key: PORT
+        value: 8000
+    healthCheckPath: /
+    
+  - type: web
+    name: multi-llm-blog-automation-frontend
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://multi-llm-blog-automation-backend.onrender.com

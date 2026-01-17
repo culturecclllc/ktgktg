@@ -1,0 +1,68 @@
+/* postcss-ignore */
+@tailwind base;
+/* postcss-ignore */
+@tailwind components;
+/* postcss-ignore */
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* 입력창 텍스트 색상 수정 */
+input[type="text"],
+input[type="password"],
+input[type="email"],
+textarea {
+  color: #171717 !important;
+}
+
+input[type="text"]::placeholder,
+input[type="password"]::placeholder,
+input[type="email"]::placeholder,
+textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* 다크모드에서도 텍스트가 잘 보이도록 */
+/* 단, 배경이 흰색인 경우 검은색 텍스트 사용 */
+@media (prefers-color-scheme: dark) {
+  input[type="text"]:not(.login-input),
+  input[type="password"]:not(.login-input),
+  input[type="email"]:not(.login-input),
+  textarea:not(.login-input) {
+    color: #ededed !important;
+  }
+  
+  input[type="text"]:not(.login-input)::placeholder,
+  input[type="password"]:not(.login-input)::placeholder,
+  input[type="email"]:not(.login-input)::placeholder,
+  textarea:not(.login-input)::placeholder {
+    color: #6b7280 !important;
+  }
+}
+
+/* 로그인 페이지 input은 항상 검은색 */
+input.login-input {
+  color: #000000 !important;
+}
