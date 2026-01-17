@@ -37,6 +37,12 @@ export default function LoginPage({ onLoginSuccess }: LoginPageProps) {
       const data = await response.json();
 
       if (response.ok) {
+        // session_id를 localStorage에 저장
+        if (data.session_id) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('session_id', data.session_id);
+          }
+        }
         onLoginSuccess();
       } else {
         setError(data.detail || '로그인에 실패했습니다.');

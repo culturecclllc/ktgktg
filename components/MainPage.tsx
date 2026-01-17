@@ -7,6 +7,7 @@ import * as Label from '@radix-ui/react-label';
 import * as Select from '@radix-ui/react-select';
 import SettingsPage from './SettingsPage';
 import HistoryPage from './HistoryPage';
+import { getAuthHeaders, getSessionId } from '@/lib/session';
 
 interface MainPageProps {
   onLogout: () => void;
@@ -96,6 +97,7 @@ export default function MainPage({ onLogout }: MainPageProps) {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
         const response = await fetch(`${backendUrl}/api/settings/api-keys`, {
           credentials: 'include',
+          headers: getAuthHeaders(),
         });
 
         if (response.ok) {
@@ -170,9 +172,7 @@ export default function MainPage({ onLogout }: MainPageProps) {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
         const response = await fetch(`${backendUrl}/api/generate/draft`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAuthHeaders(),
           credentials: 'include',
           body: JSON.stringify({
             topic,
@@ -369,9 +369,7 @@ export default function MainPage({ onLogout }: MainPageProps) {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
         const response = await fetch(`${backendUrl}/api/analyze/draft`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: getAuthHeaders(),
           credentials: 'include',
           body: JSON.stringify({
             draft_content: draft.content,
@@ -486,9 +484,7 @@ export default function MainPage({ onLogout }: MainPageProps) {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/api/generate/final`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         credentials: 'include',
         body: JSON.stringify({
           topic,
@@ -544,6 +540,7 @@ export default function MainPage({ onLogout }: MainPageProps) {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
       await fetch(`${backendUrl}/api/auth/logout`, {
         method: 'POST',
+        headers: getAuthHeaders(),
         credentials: 'include',
       });
       onLogout();

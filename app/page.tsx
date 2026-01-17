@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getAuthHeaders } from '@/lib/session';
 import { motion } from 'framer-motion';
 import LoginPage from '@/components/LoginPage';
 import MainPage from '@/components/MainPage';
@@ -19,6 +20,7 @@ export default function Home() {
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
         const response = await fetch(`${backendUrl}/api/auth/check`, {
           credentials: 'include',
+          headers: getAuthHeaders(),
           signal: controller.signal,
         });
         if (response.ok) {

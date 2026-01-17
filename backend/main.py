@@ -143,7 +143,8 @@ async def login(request: LoginRequest):
             session_id = SessionManager.create_session(request.user_id)
             response = JSONResponse({
                 "success": True,
-                "message": "로그인 성공"
+                "message": "로그인 성공",
+                "session_id": session_id  # 프론트엔드에서 헤더로 사용할 수 있도록 반환
             })
             response.set_cookie(
                 key="session_id",

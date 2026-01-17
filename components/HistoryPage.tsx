@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getAuthHeaders } from '@/lib/session';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Copy, Code, Calendar, FileText, Loader2, Hash } from 'lucide-react';
 
@@ -36,6 +37,7 @@ export default function HistoryPage({ onBack }: HistoryPageProps) {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/api/history/articles`, {
         credentials: 'include',
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {

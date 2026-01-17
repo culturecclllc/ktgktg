@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getAuthHeaders } from '@/lib/session';
 import { motion } from 'framer-motion';
 import { Save, Key, CheckCircle2 } from 'lucide-react';
 import * as Label from '@radix-ui/react-label';
@@ -22,9 +23,7 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/api/settings/api-keys`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         credentials: 'include',
         body: JSON.stringify(apiKeys),
       });

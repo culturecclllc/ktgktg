@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { getAuthHeaders } from '@/lib/session';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Copy, Code, Calendar, FileText, Loader2, RefreshCw } from 'lucide-react';
 
@@ -40,9 +41,7 @@ export default function NotionHistoryPage({ onBack }: NotionHistoryPageProps) {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/api/history/articles`, {
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
       });
 
       if (response.ok) {
