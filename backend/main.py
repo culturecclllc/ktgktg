@@ -5,6 +5,9 @@ from pydantic import BaseModel
 from typing import Optional
 import sys
 import os
+import jwt
+import time
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # .env 파일에서 환경 변수 로드
@@ -30,10 +33,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 세션 관리 (간단한 인메모리 방식)
-sessions = {}
+# JWT 설정
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ynk-blog-automation-secret-key-change-in-production")  # 프로덕션에서는 환경 변수로 설정
+JWT_ALGORITHM = "HS256"
+JWT_EXPIRATION_HOURS = 24 * 7  # 7일
 
-# 사용자별 API 키 저장 (세션 기반)
+# 사용자별 API 키 저장 (user_id 기반)
 user_api_keys = {}
 
 
@@ -92,56 +97,63 @@ class SaveArticleRequest(BaseModel):
     database_id: Optional[str] = None  # Notion Database ID (선택사항)
 
 
-class SessionManager:
+class JWTAuth:
     @staticmethod
-    def create_session(user_id: str) -> str:
-        import secrets
-        session_id = secrets.token_urlsafe(32)
-        sessions[session_id] = user_id
-        return session_id
-
+    def create_token(user_id: str) -> str:
+        """JWT 토큰 생성"""
+        payload = {
+            "user_id": user_id,
+            "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRATION_HOURS),
+            "iat": datetime.utcnow()
+        }
+        token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
+        return token
+    
     @staticmethod
-    def get_user_id(session_id: str) -> Optional[str]:
-        return sessions.get(session_id)
+    def verify_token(token: str) -> Optional[str]:
+        """JWT 토큰 검증 및 user_id 반환"""
+        try:
+            payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
+            user_id = payload.get("user_id")
+            return user_id
+        except jwt.ExpiredSignatureError:
+            # 토큰 만료
+            return None
+        except jwt.InvalidTokenError:
+            # 토큰 무효
+            return None
 
-    @staticmethod
-    def delete_session(session_id: str):
-        if session_id in sessions:
-            del sessions[session_id]
 
-
-def get_session_id(request: Request) -> Optional[str]:
-    """쿠키나 헤더에서 세션 ID 가져오기 (X-Session-ID 헤더 우선)"""
-    session_id = request.headers.get("X-Session-ID")  # X-Session-ID 헤더 우선 확인
-    if not session_id:
-        session_id = request.cookies.get("session_id")  # 없으면 쿠키 확인 (fallback)
-    return session_id
+def get_jwt_token(request: Request) -> Optional[str]:
+    """헤더나 쿠키에서 JWT 토큰 가져오기 (X-Session-ID 헤더 우선)"""
+    token = request.headers.get("X-Session-ID")  # X-Session-ID 헤더에서 토큰 가져오기
+    if not token:
+        token = request.cookies.get("session_id")  # 없으면 쿠키에서 확인 (fallback)
+    return token
 
 
 def require_auth(request: Request):
-    """인증이 필요한 엔드포인트용 의존성"""
-    session_id = get_session_id(request)
+    """인증이 필요한 엔드포인트용 의존성 (JWT 토큰 기반)"""
+    token = get_jwt_token(request)
     
     # 디버깅 로그
-    print(f"🔍 인증 확인: session_id={'있음' if session_id else '없음'}, X-Session-ID={request.headers.get('X-Session-ID', '없음')}, Cookie={request.cookies.get('session_id', '없음')}")
+    print(f"🔍 인증 확인: token={'있음' if token else '없음'}, X-Session-ID={request.headers.get('X-Session-ID', '없음')[:30]}...")
     
-    if not session_id:
-        print(f"❌ 세션 ID 없음: 로그인이 필요합니다.")
+    if not token:
+        print(f"❌ 토큰 없음: 로그인이 필요합니다.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="로그인이 필요합니다."
         )
     
-    user_id = SessionManager.get_user_id(session_id)
-    
-    # 디버깅 로그
-    print(f"🔍 세션 조회: session_id={session_id[:20]}..., user_id={'있음' if user_id else '없음'}, 현재 세션 수={len(sessions)}")
+    # JWT 토큰 검증
+    user_id = JWTAuth.verify_token(token)
     
     if not user_id:
-        print(f"❌ 세션 만료: session_id={session_id[:20] if session_id else 'None'}...가 세션 목록에 없습니다.")
+        print(f"❌ 토큰 만료 또는 무효: 토큰이 만료되었거나 유효하지 않습니다.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="세션이 만료되었습니다."
+            detail="세션이 만료되었습니다. 다시 로그인해주세요."
         )
     
     print(f"✅ 인증 성공: user_id={user_id}")
@@ -153,19 +165,22 @@ async def login(request: LoginRequest):
     """노션 기반 로그인"""
     try:
         if check_login(request.user_id, request.user_pw):
-            session_id = SessionManager.create_session(request.user_id)
+            # JWT 토큰 생성 (7일 유효)
+            token = JWTAuth.create_token(request.user_id)
+            print(f"✅ 로그인 성공: user_id={request.user_id}, JWT 토큰 생성됨 (7일 유효)")
+            
             response = JSONResponse({
                 "success": True,
                 "message": "로그인 성공",
-                "session_id": session_id  # 프론트엔드에서 헤더로 사용할 수 있도록 반환
+                "session_id": token  # JWT 토큰을 session_id로 반환 (프론트엔드 호환성 유지)
             })
             response.set_cookie(
                 key="session_id",
-                value=session_id,
+                value=token,
                 httponly=True,
                 samesite="none",  # 다른 도메인 간 요청을 위해 "none" 필요
                 secure=True,  # HTTPS 환경을 위해 필요
-                max_age=86400,  # 24시간
+                max_age=JWT_EXPIRATION_HOURS * 3600,  # 7일 (초 단위)
                 domain=None  # 도메인을 명시하지 않으면 요청 도메인에 자동 설정
             )
             return response

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAuthHeaders } from '@/lib/session';
+import { getAuthHeaders, getSessionId } from '@/lib/session';
 import { motion } from 'framer-motion';
 import LoginPage from '@/components/LoginPage';
 import MainPage from '@/components/MainPage';
@@ -13,6 +13,14 @@ export default function Home() {
   useEffect(() => {
     // 세션 확인
     const checkAuth = async () => {
+      // localStorage에 세션 ID가 없으면 바로 로그인 페이지로
+      const sessionId = getSessionId();
+      if (!sessionId) {
+        console.log('세션 ID가 없습니다. 로그인이 필요합니다.');
+        setIsAuthenticated(false);
+        setIsLoading(false);
+        return;
+      }
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 5000); // 5초 타임아웃
 
