@@ -25,7 +25,7 @@ yarn-error.log*
 
 # Local env files
 .env*.local
-.env
+# .env 파일은 Git에 포함 (주의: API 키가 공개됩니다)
 
 # Vercel
 .vercel
