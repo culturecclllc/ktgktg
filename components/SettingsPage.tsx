@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getAuthHeaders } from '@/lib/session';
+import { getAuthHeaders, getSessionId } from '@/lib/session';
 import { motion } from 'framer-motion';
 import { Save, Key, CheckCircle2 } from 'lucide-react';
 import * as Label from '@radix-ui/react-label';
@@ -20,6 +20,14 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
 
   const handleSave = async () => {
     try {
+      // 세션 ID 확인
+      const sessionId = getSessionId();
+      if (!sessionId) {
+        alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+        onBack(); // 메인 페이지로 돌아가서 로그인 페이지로 이동
+        return;
+      }
+
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
       const response = await fetch(`${backendUrl}/api/settings/api-keys`, {
         method: 'POST',
@@ -27,6 +35,17 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
         credentials: 'include',
         body: JSON.stringify(apiKeys),
       });
+
+      // 401 오류 처리
+      if (response.status === 401) {
+        alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+        // localStorage에서 session_id 제거
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('session_id');
+        }
+        onBack(); // 메인 페이지로 돌아가서 로그인 페이지로 이동
+        return;
+      }
 
       if (response.ok) {
         setSaved(true);
@@ -45,11 +64,28 @@ export default function SettingsPage({ onBack }: SettingsPageProps) {
     // 백엔드에서 사용자별 API 키 조회
     const fetchApiKeys = async () => {
       try {
+        // 세션 ID 확인
+        const sessionId = getSessionId();
+        if (!sessionId) {
+          console.warn('세션 ID가 없습니다. 로그인이 필요합니다.');
+          return;
+        }
+
         const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
         const response = await fetch(`${backendUrl}/api/settings/api-keys`, {
           headers: getAuthHeaders(), // X-Session-ID 헤더 추가
           credentials: 'include',
         });
+
+        // 401 오류 처리
+        if (response.status === 401) {
+          console.warn('세션이 만료되었습니다.');
+          // localStorage에서 session_id 제거
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('session_id');
+          }
+          return;
+        }
 
         if (response.ok) {
           const data = await response.json();
