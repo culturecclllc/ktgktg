@@ -38,7 +38,7 @@ export default function NotionHistoryPage({ onBack }: NotionHistoryPageProps) {
       // TODO: 여기에 새로운 Notion API 엔드포인트 URL을 입력하세요
       // 예: 'http://localhost:8000/api/notion/articles'
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-      const response = await fetch(`${backendUrl}/api/notion/articles`, {
+      const response = await fetch(`${backendUrl}/api/history/articles`, {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
