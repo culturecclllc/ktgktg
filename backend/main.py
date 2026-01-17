@@ -149,7 +149,8 @@ async def login(request: LoginRequest):
                 key="session_id",
                 value=session_id,
                 httponly=True,
-                samesite="lax",
+                samesite="none",  # 다른 도메인 간 요청을 위해 "none" 필요
+                secure=True,  # HTTPS 환경을 위해 필요
                 max_age=86400  # 24시간
             )
             return response
